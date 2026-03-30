@@ -23,6 +23,13 @@ class Settings(BaseSettings):
     MAX_DIFF_SIZE: int = 50000  # 最大 diff 字节数
     REVIEW_TIMEOUT: int = 120   # 审查超时秒数
 
+    # Agent 配置
+    AGENT_MODE: str = "single"  # single / multi - 单进程或多 Agent 模式
+    COORDINATOR_PORT: int = 8080
+    SECURITY_AGENT_PORT: int = 8081
+    LLM_AGENT_PORT: int = 8082
+    AGENT_TIMEOUT: int = 120  # Agent 间调用超时
+
     class Config:
         env_file = ".env"
 
