@@ -1,6 +1,7 @@
 from typing import Optional, List
 import logging
 from app.gitlab_client import GitLabClient
+from app.github_client import GitHubClient
 from app.llm_client import LLMClient
 from app.utils.code_parser import parse_diff
 from app.utils.sanitizer import sanitize_code
@@ -15,12 +16,15 @@ class CodeReviewer:
 
     def __init__(self):
         self.gitlab = GitLabClient()
+        self.github = GitHubClient()
         self.llm = LLMClient()
         self.settings = get_settings()
 
-    async def review_mr(self, project_id: int, mr_iid: int) -> dict:
-        """执行完整的 MR 代码审查"""
-        logger.info(f"开始审查 MR #{mr_iid} (项目 {project_id})")
+    # ==================== GitLab 审查 ====================
+
+    async def review_gitlab_mr(self, project_id: int, mr_iid: int) -> dict:
+        """执行 GitLab MR 代码审查"""
+        logger.info(f"开始审查 GitLab MR #{mr_iid} (项目 {project_id})")
 
         # 1. 获取 MR 信息和变更
         try:
@@ -52,6 +56,7 @@ class CodeReviewer:
             return {"status": "skipped", "reason": "diff_too_large"}
 
         results = {
+            "platform": "gitlab",
             "project_id": project_id,
             "mr_iid": mr_iid,
             "status": "completed",
@@ -108,7 +113,118 @@ class CodeReviewer:
         await self.gitlab.post_summary_comment(project_id, mr_iid, summary)
         results["summary"] = summary
 
-        logger.info(f"MR #{mr_iid} 审查完成，发现 {len(results['reviews'])} 个问题")
+        logger.info(f"GitLab MR #{mr_iid} 审查完成，发现 {len(results['reviews'])} 个问题")
+        return results
+
+    # ==================== GitHub 审查 ====================
+
+    async def review_github_pr(self, owner: str, repo: str, pr_number: int) -> dict:
+        """执行 GitHub PR 代码审查"""
+        logger.info(f"开始审查 GitHub PR #{pr_number} ({owner}/{repo})")
+
+        # 1. 获取 PR 信息
+        try:
+            pr_info = await self.github.get_pr_info(owner, repo, pr_number)
+            pr_files = await self.github.get_pr_files(owner, repo, pr_number)
+        except Exception as e:
+            logger.error(f"获取 PR 数据失败: {e}")
+            return {"status": "error", "message": str(e)}
+
+        pr_title = pr_info.get("title", "")
+        pr_body = pr_info.get("body", "")
+        author = pr_info.get("user", {}).get("login", "unknown")
+        head_sha = pr_info.get("head", {}).get("sha", "")
+        base_ref = pr_info.get("base", {}).get("ref", "")
+
+        # 检查变更大小
+        if not pr_files:
+            logger.info(f"PR #{pr_number} 无代码变更")
+            return {"status": "skipped", "reason": "no_changes"}
+
+        # 过滤过大的 diff
+        diff_size = sum(len(f.get("patch", "")) for f in pr_files)
+        if diff_size > self.settings.MAX_DIFF_SIZE:
+            logger.warning(f"PR #{pr_number} diff 过大 ({diff_size} bytes)")
+            await self.github.create_issue_comment(
+                owner, repo, pr_number,
+                "⚠️ 本次代码变更过大，已跳过自动审查。请人工仔细审查。"
+            )
+            return {"status": "skipped", "reason": "diff_too_large"}
+
+        results = {
+            "platform": "github",
+            "owner": owner,
+            "repo": repo,
+            "pr_number": pr_number,
+            "status": "completed",
+            "reviews": []
+        }
+
+        # 2. 审查每个文件变更
+        review_comments = []
+        file_count = 0
+
+        for file_data in pr_files:
+            file_path = file_data.get("filename")
+            patch = file_data.get("patch", "")
+            status = file_data.get("status", "modified")
+
+            # 跳过非代码文件和删除的文件
+            if not patch or status == "removed" or self._should_skip_file(file_path):
+                continue
+
+            file_count += 1
+            # 脱敏处理
+            safe_patch = sanitize_code(patch)
+
+            # 解析变更块
+            change_blocks = parse_diff(safe_patch)
+
+            # 审查每个变更块
+            position = 1
+            for block in change_blocks:
+                if not block.get("content"):
+                    continue
+
+                review_result = await self._review_code_block(
+                    file_path, block, pr_title
+                )
+
+                if review_result and review_result.get("comment"):
+                    results["reviews"].append(review_result)
+
+                    # 收集评论（批量提交）
+                    review_comments.append({
+                        "path": file_path,
+                        "position": position,
+                        "body": review_result["comment"]
+                    })
+
+                position += 1
+
+        # 3. 批量发布审查评论
+        if review_comments and head_sha:
+            try:
+                await self.github.create_review(
+                    owner, repo, pr_number,
+                    head_sha,
+                    review_comments,
+                    body="🤖 AI 代码审查完成，详见下方评论。"
+                )
+            except Exception as e:
+                logger.warning(f"批量发布评论失败: {e}")
+
+        # 4. 生成变更总结
+        summary = await self._generate_summary(
+            pr_title, pr_body,
+            [{"new_path": f.get("filename"), "diff": f.get("patch", "")} for f in pr_files],
+            author, file_count
+        )
+
+        await self.github.create_issue_comment(owner, repo, pr_number, summary)
+        results["summary"] = summary
+
+        logger.info(f"GitHub PR #{pr_number} 审查完成，发现 {len(results['reviews'])} 个问题")
         return results
 
     async def _review_code_block(

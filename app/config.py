@@ -8,6 +8,10 @@ class Settings(BaseSettings):
     GITLAB_TOKEN: str = ""  # Access Token
     GITLAB_WEBHOOK_SECRET: str = ""  # Webhook 验证 Token
 
+    # GitHub 配置
+    GITHUB_TOKEN: str = ""  # Personal Access Token
+    GITHUB_WEBHOOK_SECRET: str = ""  # Webhook 验证 Secret
+
     # LLM 配置（支持国内模型）
     LLM_PROVIDER: str = "deepseek"  # deepseek / qwen / zhipu
     LLM_API_KEY: str = ""
