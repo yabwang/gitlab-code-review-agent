@@ -1,0 +1,29 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: gitlab-code-review-agent
+
+# GitLab 配置
+gitlab:
+  url: https://gitlab.yourcompany.com
+  token: ${GITLAB_TOKEN:}
+  webhook-secret: ${GITLAB_WEBHOOK_SECRET:}
+
+# GitHub 配置
+github:
+  token: ${GITHUB_TOKEN:}
+  webhook-secret: ${GITHUB_WEBHOOK_SECRET:}
+
+# LLM 配置
+llm:
+  provider: ${LLM_PROVIDER:deepseek}
+  api-key: ${LLM_API_KEY:}
+  api-url: ${LLM_API_URL:https://api.deepseek.com/v1}
+  model: ${LLM_MODEL:deepseek-coder}
+
+# 审查配置
+review:
+  max-diff-size: 50000
+  timeout: 120

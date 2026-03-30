@@ -1,20 +1,11 @@
-FROM python:3.11-slim
-
+FROM eclipse-temurin:17-jdk-alpine as build
 WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN apk add --no-cache maven && mvn clean package -DskipTests
 
-# 安装依赖
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# 复制应用代码
-COPY app/ ./app/
-
-# 环境变量
-ENV PYTHONUNBUFFERED=1
-ENV PYTHONDONTWRITEBYTECODE=1
-
-# 暴露端口
+FROM eclipse-temurin:17-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
-
-# 启动命令
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+ENTRYPOINT ["java", "-jar", "app.jar"]
