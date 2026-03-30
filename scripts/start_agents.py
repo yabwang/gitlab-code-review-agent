@@ -98,7 +98,41 @@ async def start_agent(agent_name: str, port: int = None):
 
 def run_agent_process(agent_name: str, port: int = None):
     """在独立进程中运行 Agent"""
-    asyncio.run(start_agent(agent_name, port))
+    config = AGENTS.get(agent_name)
+    if not config:
+        raise ValueError(f"Unknown agent: {agent_name}")
+
+    port = port or config["default_port"]
+
+    # 动态导入 Agent 类
+    AgentClass = import_agent(agent_name)
+    agent = AgentClass()
+    agent.port = port
+
+    # 获取配置（同步）
+    settings = get_settings()
+    agent_config = {
+        "llm_provider": settings.LLM_PROVIDER,
+        "llm_api_key": settings.LLM_API_KEY,
+        "llm_api_url": settings.LLM_API_URL,
+        "llm_model": settings.LLM_MODEL,
+    }
+
+    # 初始化 Agent（同步方式）
+    import asyncio
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(agent.initialize(agent_config))
+
+    logger.info(f"启动 {agent.name} 在端口 {port}")
+
+    # 启动 uvicorn（阻塞调用）
+    uvicorn.run(
+        agent.get_app(),
+        host="0.0.0.0",
+        port=port,
+        log_level="info"
+    )
 
 
 def start_all_agents():

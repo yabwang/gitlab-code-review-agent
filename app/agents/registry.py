@@ -2,7 +2,7 @@
 Agent 注册中心 - 管理 Agent 的注册、发现和状态
 """
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
 from .protocol import AgentInfo, AgentCapability, AgentStatus
 
