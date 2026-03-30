@@ -84,3 +84,55 @@ class LLMClient:
             result = await self.chat(system_prompt, user_message)
             results.append(result)
         return results
+
+    async def fix_code(
+        self,
+        file_path: str,
+        issue_type: str,
+        issue_description: str,
+        original_code: str,
+        start_line: int,
+        end_line: int
+    ) -> str:
+        """调用 LLM 生成修复后的代码"""
+        from app.utils.prompt_templates import CODE_FIX_PROMPT
+
+        system_prompt = CODE_FIX_PROMPT.format(
+            file_path=file_path,
+            issue_type=issue_type,
+            issue_description=issue_description,
+            original_code=original_code,
+            start_line=start_line,
+            end_line=end_line
+        )
+
+        user_message = "请生成修复后的代码。"
+
+        result = await self.chat(system_prompt, user_message)
+
+        # 处理返回结果
+        if "CANNOT_FIX" in result:
+            logger.info(f"LLM 无法自动修复: {file_path}")
+            return None
+
+        # 提取代码块内容
+        code = self._extract_code_block(result)
+        if code:
+            logger.info(f"LLM 生成修复代码成功: {file_path}")
+            return code
+
+        # 如果没有代码块，直接返回结果（可能是纯代码）
+        if result and not result.startswith("CANNOT_FIX"):
+            return result.strip()
+
+        return None
+
+    def _extract_code_block(self, text: str) -> str:
+        """从 LLM 返回中提取代码块内容"""
+        import re
+        # 匹配 ```language 或 ``` 包裹的代码块
+        pattern = r'```(?:\w*\n)?(.*?)```'
+        matches = re.findall(pattern, text, re.DOTALL)
+        if matches:
+            return matches[0].strip()
+        return None

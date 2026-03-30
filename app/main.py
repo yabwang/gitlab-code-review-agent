@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 from app.config import get_settings
 from app.reviewer import CodeReviewer
+from app.fixer import CodeFixer
 
 # 配置日志
 logging.basicConfig(
@@ -207,14 +208,18 @@ async def root():
     """服务根信息"""
     return {
         "name": "GitLab/GitHub AI Code Review Agent",
-        "version": "1.1.0",
-        "description": "智能代码审查服务，支持 GitLab 和 GitHub",
+        "version": "1.2.0",
+        "description": "智能代码审查服务，支持 GitLab 和 GitHub，可自动生成修复建议",
         "endpoints": {
             "gitlab_webhook": "/webhook/gitlab",
             "github_webhook": "/webhook/github",
+            "gitlab_review": "/review/gitlab/{project_id}/{mr_iid}",
+            "github_review": "/review/github/{owner}/{repo}/{pr_number}",
+            "gitlab_fix": "/fix/gitlab/{project_id}/{mr_iid}",
+            "github_fix": "/fix/github/{owner}/{repo}/{pr_number}",
             "health": "/health"
         },
-        "supported_llm": ["deepseek", "qwen", "zhipu", "doubao"]
+        "supported_llm": ["deepseek", "qwen", "zhipu", "doubao", "custom"]
     }
 
 
@@ -239,4 +244,50 @@ async def manual_github_review(owner: str, repo: str, pr_number: int, background
         "status": "accepted",
         "platform": "github",
         "message": f"审查任务已启动: PR #{pr_number}"
+    }
+
+
+# ==================== 修复端点 ====================
+
+async def run_gitlab_fix_task(project_id: int, mr_iid: int):
+    """后台执行 GitLab 代码修复任务"""
+    try:
+        fixer = CodeFixer()
+        result = await fixer.fix_gitlab_mr(project_id, mr_iid)
+        logger.info(f"GitLab 修复完成: {result.get('status')}, 修复数: {len(result.get('fixes', []))}")
+    except Exception as e:
+        logger.error(f"GitLab 修复任务失败: {e}")
+
+
+async def run_github_fix_task(owner: str, repo: str, pr_number: int):
+    """后台执行 GitHub 代码修复任务"""
+    try:
+        fixer = CodeFixer()
+        result = await fixer.fix_github_pr(owner, repo, pr_number)
+        logger.info(f"GitHub 修复完成: {result.get('status')}, 修复数: {len(result.get('fixes', []))}")
+    except Exception as e:
+        logger.error(f"GitHub 修复任务失败: {e}")
+
+
+@app.post("/fix/gitlab/{project_id}/{mr_iid}")
+async def manual_gitlab_fix(project_id: int, mr_iid: int, background_tasks: BackgroundTasks):
+    """手动触发 GitLab MR 修复"""
+    logger.info(f"手动触发 GitLab 修复: 项目 {project_id}, MR #{mr_iid}")
+    background_tasks.add_task(run_gitlab_fix_task, project_id, mr_iid)
+    return {
+        "status": "accepted",
+        "platform": "gitlab",
+        "message": f"修复任务已启动: MR #{mr_iid}"
+    }
+
+
+@app.post("/fix/github/{owner}/{repo}/{pr_number}")
+async def manual_github_fix(owner: str, repo: str, pr_number: int, background_tasks: BackgroundTasks):
+    """手动触发 GitHub PR 修复"""
+    logger.info(f"手动触发 GitHub 修复: {owner}/{repo} PR #{pr_number}")
+    background_tasks.add_task(run_github_fix_task, owner, repo, pr_number)
+    return {
+        "status": "accepted",
+        "platform": "github",
+        "message": f"修复任务已启动: PR #{pr_number}"
     }
