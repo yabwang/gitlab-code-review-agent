@@ -9,7 +9,6 @@ import com.github.review.agent.config.ReviewConfig;
 import com.github.review.agent.model.ReviewResult;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.gitlab4j.api.models.MergeRequest;
 import org.kohsuke.github.GHPullRequest;
 import org.kohsuke.github.GHPullRequestFileDetail;
 import org.springframework.scheduling.annotation.Async;
@@ -40,11 +39,42 @@ public class ReviewService {
         log.info("开始审查 GitLab MR: project={}, mr={}", projectId, mrIid);
 
         try {
-            MergeRequest mr = gitlabClient.getMergeRequestChanges(projectId, mrIid);
-            String title = mr.getTitle();
-            String description = mr.getDescription();
+            JsonNode mr = gitlabClient.getMergeRequestChanges(projectId, mrIid);
+            String title = mr.path("title").asText();
+            String description = mr.path("description").asText("");
 
             List<ReviewResult.ReviewComment> comments = new ArrayList<>();
+
+            // 审查文件变更
+            JsonNode changes = mr.path("changes");
+            if (changes.isArray()) {
+                for (JsonNode change : changes) {
+                    String filename = change.path("new_path").asText();
+                    String diff = change.path("diff").asText();
+
+                    if (diff != null && !diff.isEmpty() && !shouldSkipFile(filename)) {
+                        // 审查代码质量
+                        String qualityResult = llmClient.reviewQuality(filename, diff);
+                        if (!"无问题".equals(qualityResult) && !"无问题。".equals(qualityResult)) {
+                            comments.add(ReviewResult.ReviewComment.builder()
+                                    .file(filename)
+                                    .comment(qualityResult)
+                                    .type("quality")
+                                    .build());
+                        }
+
+                        // 安全扫描
+                        String securityResult = llmClient.scanSecurity(filename, diff);
+                        if (!"无安全风险".equals(securityResult) && !"无安全风险。".equals(securityResult)) {
+                            comments.add(ReviewResult.ReviewComment.builder()
+                                    .file(filename)
+                                    .comment(securityResult)
+                                    .type("security")
+                                    .build());
+                        }
+                    }
+                }
+            }
 
             // 生成审查报告
             String summary = llmClient.generateSummary(title, description, comments.size());

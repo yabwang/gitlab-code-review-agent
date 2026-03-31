@@ -7,7 +7,7 @@ spring:
 
 # GitLab 配置
 gitlab:
-  url: https://gitlab.yourcompany.com
+  url: ${GITLAB_URL:https://gitlab.yourcompany.com}
   token: ${GITLAB_TOKEN:}
   webhook-secret: ${GITLAB_WEBHOOK_SECRET:}
 
