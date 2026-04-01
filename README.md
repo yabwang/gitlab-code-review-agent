@@ -1,13 +1,12 @@
-# GitLab/GitHub AI Code Review Agent (Java)
+# Multi Platform Agent (Java)
 
-智能代码审查服务，支持 GitLab 和 GitHub Webhook 自动触发 AI 代码审查。
+AI-powered multi-platform agent for code review and more.
 
 ## 技术栈
 
-- Java 17
+- Java 21
 - Spring Boot 3.2
 - LangChain4j (LLM 集成)
-- gitlab4j-api (GitLab API)
 - github-api (GitHub API)
 
 ## 功能特性
@@ -33,7 +32,7 @@ cp .env.example .env
 mvn clean package -DskipTests
 
 # 运行
-java -jar target/gitlab-code-review-agent-2.0.0-java.jar
+java -jar target/multi-platform-agent-2.0.0-java.jar
 
 # 或使用 Maven
 mvn spring-boot:run
@@ -74,7 +73,7 @@ docker-compose up -d
 
 ```
 src/main/java/com/github/review/agent/
-├── GitlabCodeReviewAgentApplication.java  # 主类
+├── MultiPlatformAgentApplication.java  # 主类
 ├── config/           # 配置类
 ├── controller/       # 控制器
 ├── service/          # 业务服务

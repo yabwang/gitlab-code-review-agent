@@ -12,10 +12,10 @@
     </parent>
 
     <groupId>com.github.review</groupId>
-    <artifactId>gitlab-code-review-agent</artifactId>
+    <artifactId>multi-platform-agent</artifactId>
     <version>2.0.0-java</version>
-    <name>GitLab Code Review Agent</name>
-    <description>AI-powered code review agent for GitLab/GitHub</description>
+    <name>Multi Platform Agent</name>
+    <description>AI-powered multi-platform agent for code review and more</description>
 
     <properties>
         <java.version>21</java.version>

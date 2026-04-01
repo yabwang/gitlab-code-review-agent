@@ -26,9 +26,9 @@ public class ApiController {
     @GetMapping("/")
     public ResponseEntity<ApiResponse<Map<String, Object>>> root() {
         Map<String, Object> info = new HashMap<>();
-        info.put("name", "GitLab/GitHub AI Code Review Agent");
+        info.put("name", "Multi Platform Agent");
         info.put("version", "2.0.0-java");
-        info.put("description", "智能代码审查服务，Java 版本");
+        info.put("description", "AI-powered multi-platform agent for code review and more");
 
         Map<String, String> endpoints = new HashMap<>();
         endpoints.put("gitlab_webhook", "/webhook/gitlab");

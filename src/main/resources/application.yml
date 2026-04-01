@@ -3,7 +3,7 @@ server:
 
 spring:
   application:
-    name: gitlab-code-review-agent
+    name: multi-platform-agent
 
 # GitLab 配置
 gitlab:

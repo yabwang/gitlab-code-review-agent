@@ -1,4 +1,4 @@
-# GitLab Code Review Agent - 功能清单
+# Multi Platform Agent - 功能清单
 
 ## 已完成功能 ✅
 
@@ -74,4 +74,5 @@
 
 ## 更新日志
 
+- 2026-04-01: 项目重命名为 multi-platform-agent
 - 2026-03-31: 初始版本，完成 GitLab/GitHub 基础审查功能
